@@ -1,5 +1,6 @@
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ControlAviones {
 
@@ -52,9 +53,13 @@ public class ControlAviones {
         System.out.print("Bienvenido al Control de Aviones, escoja el caso que desea ejecutar: ");
         String file = scanner.nextLine();
 
-
+        System.out.print("¿Usar Best Improvement? (true/false): ");
+        boolean usarBestImprovement = scanner.nextBoolean();
+        
         scanner.close();
         
+
+        // Lectura de los archivos
         String chosenFile;
         switch (file) {
             case "1" -> chosenFile = "case1.txt";
@@ -86,19 +91,13 @@ public class ControlAviones {
             }
 
             
-
-            // 1. Generar orden inicial
-            List<Avion> ordenInicial = generarOrdenInicial(aviones);
+            
+            List<Avion> ordenInicial = ordenDeterminista(aviones);
             List<Asignacion> asignacionesIniciales = asignarTiempos(ordenInicial);
 
-            // 2. Mostrar costo inicial
-            double costoInicial = calcularCosto(asignacionesIniciales);
-            System.out.println("Costo inicial: " + costoInicial);
+            List<Asignacion> solucion = buscarMejorSolucion(asignacionesIniciales, usarBestImprovement);
 
-            // 3. Buscar mejor vecino
-            List<Asignacion> mejorAsignacion = MejorVecino(asignacionesIniciales);
-            double mejorCosto = calcularCosto(mejorAsignacion);
-            System.out.println("Costo mejorado: " + mejorCosto);
+            System.out.println("Costo final: " + calcularCosto(solucion));
 
             
             
@@ -122,30 +121,12 @@ public class ControlAviones {
 
             
 
-
-
-            
-
-            //-------------------
-
-            
-        
-
-
-            
-
-            
-            
-
-            
-            
-
-            
-
         } catch (IOException | NumberFormatException e) {
             System.err.println("Error: " + e.getMessage());
         }
     }
+
+    
 
     public static void imprimirAviones(List<Avion> aviones) {
         for (Avion avion : aviones) {
@@ -158,9 +139,133 @@ public class ControlAviones {
             System.out.println(asignacion);
         }
     }
+    
+
+    //+---------------------+
+    //+-------Greedy--------+
+    //+---------------------+
+
+    public static List<Avion> ordenDeterminista(List<Avion> aviones) {
+        aviones.sort((a1, a2) -> {
+            double p1 = a1.earlyPenalty + a1.latePenalty;
+            double p2 = a2.earlyPenalty + a2.latePenalty;
+            if (p1 != p2) {
+                return Double.compare(p2, p1);
+            } else {
+                return Integer.compare(a1.ideal, a2.ideal);
+            }
+        });
+        return aviones;
+    }
 
 
-    // Función para calcular el costo de una lista de aviones
+    public static List<Asignacion> ordenEstocastico(List<Avion> aviones, long seed) {
+        List<Avion> copiaAviones = new ArrayList<>(aviones); // Para no alterar el orden original
+        Random rand = new Random(seed);
+        Collections.shuffle(copiaAviones, rand);
+    
+        List<Asignacion> asignaciones = new ArrayList<>();
+    
+        for (int i = 0; i < copiaAviones.size(); i++) {
+            Avion avion = copiaAviones.get(i);
+            Asignacion anterior = (i == 0) ? null : asignaciones.get(i - 1);
+            int tiempo = calcularTiempo(avion, anterior);
+            asignaciones.add(new Asignacion(avion, tiempo));
+        }
+    
+        return asignaciones;
+    }
+
+    private static int calcularTiempo(Avion actual, Asignacion anterior) {
+        int tiempoIdeal = actual.ideal;
+        int tiempoMin = actual.early;
+        int tiempoMax = actual.late;
+        
+        if (anterior == null) {
+            return tiempoIdeal;
+        }
+    
+        int tiempoPrevio = anterior.tiempoAsignado;
+        int separacion = anterior.avion.timeDiffs.get(actual.id);
+        int tiempoAterrizaje = Math.max(tiempoIdeal, tiempoPrevio + separacion);
+    
+        return Math.min(Math.max(tiempoAterrizaje, tiempoMin), tiempoMax);
+    }
+    
+    public static List<Asignacion> asignarTiempos(List<Avion> aviones) {
+        List<Asignacion> asignaciones = new ArrayList<>();
+        for (int i = 0; i < aviones.size(); i++) {
+            Avion avion = aviones.get(i);
+            Asignacion anterior = (i == 0) ? null : asignaciones.get(i - 1);
+            int tiempo = calcularTiempo(avion, anterior);
+            asignaciones.add(new Asignacion(avion, tiempo));
+        }
+        return asignaciones;
+    }
+
+    //+---------------------+
+    //+--------GRASP--------+
+    //+---------------------+
+
+
+    public static List<Asignacion> buscarMejorSolucion(List<Asignacion> asignacionesIniciales, boolean usarBestImprovement) {
+        List<Asignacion> asignacionesActuales = new ArrayList<>(asignacionesIniciales);
+        double costoActual = calcularCosto(asignacionesActuales);
+        boolean mejora = true;
+    
+        while (mejora) {
+            mejora = false;
+            List<Asignacion> mejorVecino;
+    
+            if (usarBestImprovement) {
+                mejorVecino = MejorVecino(asignacionesActuales);
+            } else {
+                mejorVecino = UnoMejor(asignacionesActuales);
+            }
+    
+            if (mejorVecino != null) {
+                double costoVecino = calcularCosto(mejorVecino);
+                if (costoVecino < costoActual) {
+                    asignacionesActuales = mejorVecino;
+                    costoActual = costoVecino;
+                    mejora = true;
+                }
+            }
+        }
+    
+        return asignacionesActuales;
+    }
+
+    
+    
+    public static List<Asignacion> MejorVecino(List<Asignacion> asignacionesActuales) {
+        List<Asignacion> mejorAsignacion = null;
+        double mejorCosto = calcularCosto(asignacionesActuales);
+        List<List<Asignacion>> vecinos = buscarVecinos(asignacionesActuales);
+    
+        for (List<Asignacion> vecino : vecinos) {
+            double costoVecino = calcularCosto(vecino);
+            if (costoVecino < mejorCosto) {
+                mejorCosto = costoVecino;
+                mejorAsignacion = vecino;
+            }
+        }
+        return mejorAsignacion; // puede retornar null si no hay mejora
+    }
+    
+    public static List<Asignacion> UnoMejor(List<Asignacion> asignacionesActuales) {
+        List<List<Asignacion>> vecinos = buscarVecinos(asignacionesActuales);
+        double costoActual = calcularCosto(asignacionesActuales);
+    
+        for (List<Asignacion> vecino : vecinos) {
+            double costoVecino = calcularCosto(vecino);
+            if (costoVecino < costoActual) {
+                return vecino;
+            }
+        }
+        return null; // no encontró ningún vecino mejor
+    }
+
     public static double calcularCosto(List<Asignacion> asignaciones) {
         double costoTotal = 0.0;
         for (Asignacion asignacion : asignaciones) {
@@ -199,164 +304,80 @@ public class ControlAviones {
         return vecinos;
     }
 
-    public static List<Avion> generarOrdenInicial(List<Avion> aviones) {
-        aviones.sort((a1, a2) -> {
-            double p1 = a1.earlyPenalty + a1.latePenalty;
-            double p2 = a2.earlyPenalty + a2.latePenalty;
-            if (p1 != p2) {
-                return Double.compare(p2, p1);
-            } else {
-                return Integer.compare(a1.ideal, a2.ideal);
-            }
-        });
-        return aviones;
-    }
+    //+---------------------+
+    //+-----Tabu Search-----+
+    //+---------------------+
 
-    private static int calcularTiempo(Avion actual, Asignacion anterior) {
-        int tiempoIdeal = actual.ideal;
-        int tiempoMin = actual.early;
-        int tiempoMax = actual.late;
+
+    public static List<Asignacion> tabuSearch(List<Asignacion> asignacionesIniciales, int tabuSize, int maxIteraciones) {
+        List<Asignacion> solucionActual = new ArrayList<>(asignacionesIniciales);
+        List<Asignacion> mejorSolucion = new ArrayList<>(asignacionesIniciales);
+        double mejorCosto = calcularCosto(mejorSolucion);
         
-        if (anterior == null) {
-            return tiempoIdeal;
-        }
-    
-        int tiempoPrevio = anterior.tiempoAsignado;
-        int separacion = anterior.avion.timeDiffs.get(actual.id);
-        int tiempoAterrizaje = Math.max(tiempoIdeal, tiempoPrevio + separacion);
-    
-        return Math.min(Math.max(tiempoAterrizaje, tiempoMin), tiempoMax);
-    }
-    
-    public static List<Asignacion> asignarTiempos(List<Avion> aviones) {
-        List<Asignacion> asignaciones = new ArrayList<>();
-        for (int i = 0; i < aviones.size(); i++) {
-            Avion avion = aviones.get(i);
-            Asignacion anterior = (i == 0) ? null : asignaciones.get(i - 1);
-            int tiempo = calcularTiempo(avion, anterior);
-            asignaciones.add(new Asignacion(avion, tiempo));
-        }
-        return asignaciones;
-    }
+        // Lista tabu: movimientos prohibidos (guardamos pares de índices intercambiados)
+        LinkedList<String> listaTabu = new LinkedList<>();
+        
+        int iteracion = 0;
+        while (iteracion < maxIteraciones) {
+            List<List<Asignacion>> vecinos = buscarVecinos(solucionActual);
 
+            List<Asignacion> mejorVecino = null;
+            double mejorCostoVecino = Double.MAX_VALUE;
+            String mejorMovimiento = "";
 
-    public static List<Asignacion> ordenDeterminista(List<Avion> aviones) {
-        aviones.sort((a1, a2) -> {
-            double p1 = a1.earlyPenalty + a1.latePenalty;
-            double p2 = a2.earlyPenalty + a2.latePenalty;
-            if (p1 != p2) {
-                return Double.compare(p2, p1);
-            } else {
-                return Integer.compare(a1.ideal, a2.ideal);
+            // Buscar el mejor vecino no tabú o que cumpla el criterio de aspiración
+            for (List<Asignacion> vecino : vecinos) {
+                double costoVecino = calcularCosto(vecino);
+                String movimiento = identificarMovimiento(solucionActual, vecino);
+
+                if (!listaTabu.contains(movimiento) || costoVecino < mejorCosto) {
+                    if (costoVecino < mejorCostoVecino) {
+                        mejorVecino = vecino;
+                        mejorCostoVecino = costoVecino;
+                        mejorMovimiento = movimiento;
+                    }
+                }
             }
-        });
-    
-        List<Asignacion> asignaciones = new ArrayList<>();
-    
-        for (int i = 0; i < aviones.size(); i++) {
-            Avion avion = aviones.get(i);
-    
-            int tiempoIdeal = avion.ideal;
-            int tiempoMin = avion.early;
-            int tiempoMax = avion.late;
-    
-            int tiempoAterrizaje;
-    
-            if (i == 0) {
-                tiempoAterrizaje = tiempoIdeal;
-            } else {
-                Avion anterior = asignaciones.get(i - 1).avion;
-                int tiempoPrevio = asignaciones.get(i - 1).tiempoAsignado;
-                int separacion = anterior.timeDiffs.get(avion.id); // ojo con los índices
-                tiempoAterrizaje = Math.max(tiempoIdeal, tiempoPrevio + separacion);
+
+            if (mejorVecino == null) {
+                // No hay movimiento permitido, terminamos
+                break;
             }
-    
-            if (tiempoAterrizaje < tiempoMin) tiempoAterrizaje = tiempoMin;
-            if (tiempoAterrizaje > tiempoMax) tiempoAterrizaje = tiempoMax;
-    
-            asignaciones.add(new Asignacion(avion, tiempoAterrizaje));
+
+            solucionActual = mejorVecino;
+
+            // Actualizamos la lista tabu
+            listaTabu.add(mejorMovimiento);
+            if (listaTabu.size() > tabuSize) {
+                listaTabu.removeFirst(); // eliminamos el más antiguo
+            }
+
+            // Actualizar mejor solución encontrada
+            if (mejorCostoVecino < mejorCosto) {
+                mejorSolucion = mejorVecino;
+                mejorCosto = mejorCostoVecino;
+            }
+
+            iteracion++;
         }
-    
-        System.out.println("Asignaciones:");
-        for (Asignacion a : asignaciones) {
-            System.out.println(a);
-        }
-    
-        return asignaciones;
+
+        return mejorSolucion;
     }
 
-    public static List<Asignacion> ordenEstocastico(List<Avion> aviones, long seed) {
-        List<Avion> copiaAviones = new ArrayList<>(aviones); // para no alterar el orden original
-        Random rand = new Random(seed);
-        Collections.shuffle(copiaAviones, rand);
-    
-        List<Asignacion> asignaciones = new ArrayList<>();
-    
-        for (int i = 0; i < copiaAviones.size(); i++) {
-            Avion avion = copiaAviones.get(i);
-    
-            int tiempoIdeal = avion.ideal;
-            int tiempoMin = avion.early;
-            int tiempoMax = avion.late;
-    
-            int tiempoAterrizaje;
-    
-            if (i == 0) {
-                tiempoAterrizaje = tiempoIdeal;
-            } else {
-                Avion anterior = asignaciones.get(i - 1).avion;
-                int tiempoPrevio = asignaciones.get(i - 1).tiempoAsignado;
-                int separacion = anterior.timeDiffs.get(avion.id); // cuidado con los índices
-                tiempoAterrizaje = Math.max(tiempoIdeal, tiempoPrevio + separacion);
-            }
-    
-            if (tiempoAterrizaje < tiempoMin) tiempoAterrizaje = tiempoMin;
-            if (tiempoAterrizaje > tiempoMax) tiempoAterrizaje = tiempoMax;
-    
-            asignaciones.add(new Asignacion(avion, tiempoAterrizaje));
-        }
-    
-        return asignaciones;
-    }
-
-    
-    
-    public static List<Asignacion> MejorVecino(List<Asignacion> asignacionesActuales) {
-        List<Asignacion> mejorAsignacion = asignacionesActuales;
-        double mejorCosto = calcularCosto(asignacionesActuales);
-    
-        // Generar todos los vecinos
-        List<List<Asignacion>> vecinos = buscarVecinos(asignacionesActuales);
-    
-        for (List<Asignacion> vecino : vecinos) {
-            double costoVecino = calcularCosto(vecino);
-            if (costoVecino < mejorCosto) {
-                mejorCosto = costoVecino;
-                mejorAsignacion = vecino;
+    // Función auxiliar para identificar qué movimiento (swap) se hizo entre dos soluciones
+    private static String identificarMovimiento(List<Asignacion> actual, List<Asignacion> vecino) {
+        for (int i = 0; i < actual.size(); i++) {
+            if (actual.get(i).avion.id != vecino.get(i).avion.id) {
+                for (int j = i + 1; j < actual.size(); j++) {
+                    if (actual.get(j).avion.id != vecino.get(j).avion.id) {
+                        // Registramos los IDs de los aviones intercambiados
+                        return actual.get(i).avion.id + "-" + actual.get(j).avion.id;
+                    }
+                }
             }
         }
-    
-        return mejorAsignacion;
+        return "";
     }
-    
-
-    public static List<Asignacion> UnoMejor(List<Asignacion> asignaciones) {
-        // Buscar en el vecindario y quedarme con el primero que mejore
-        List<List<Asignacion>> vecinos = buscarVecinos(asignaciones);
-        List<Asignacion> mejorVecino = null;
-        double mejorCosto = calcularCosto(asignaciones);
-
-        for (List<Asignacion> vecino : vecinos) {
-            double costo = calcularCosto(vecino);
-            if (costo < mejorCosto) {
-                mejorCosto = costo;
-                mejorVecino = vecino;
-                break; // Salir al encontrar el primer vecino que mejora
-            }
-        }
-        return mejorVecino;
-    }
-
     
     
 }
