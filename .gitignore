@@ -1,8 +1,6 @@
-.ControlAviones.class
-.ControlAviones$Asignacion.class
-.determinista.java
-.determinista.class
-.determinista$Avion.class
-.estocastico.java
-.estocastico.class
-.estocastico$Avion.class
+# Clases
+*.class
+
+# Archivos de prueba
+determinista.java
+estocastico.java
