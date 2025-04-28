@@ -87,23 +87,21 @@ public class ControlAviones {
 
             
 
+            // 1. Generar orden inicial
             List<Avion> ordenInicial = generarOrdenInicial(aviones);
             List<Asignacion> asignacionesIniciales = asignarTiempos(ordenInicial);
+
+            // 2. Mostrar costo inicial
             double costoInicial = calcularCosto(asignacionesIniciales);
             System.out.println("Costo inicial: " + costoInicial);
 
-            List<List<Avion>> vecinos = buscarVecinos(ordenInicial);
-            for (List<Avion> vecinoOrden : vecinos) {
-                List<Asignacion> asignacionesVecino = asignarTiempos(vecinoOrden);
-                double costoVecino = calcularCosto(asignacionesVecino);
-                //System.out.println("Costo del vecino: " + costoVecino);
-                if (costoVecino < costoInicial) {
-                    System.out.println("Se encontró un vecino mejor." + " Costo: " + costoVecino);
-                    asignacionesIniciales = asignacionesVecino;
-                    costoInicial = costoVecino;
-                }
-            }
+            // 3. Buscar mejor vecino
+            List<Asignacion> mejorAsignacion = MejorVecino(asignacionesIniciales);
+            double mejorCosto = calcularCosto(mejorAsignacion);
+            System.out.println("Costo mejorado: " + mejorCosto);
 
+            
+            
             long seed = 18042025;
             Random rng = new Random(seed);
             
@@ -121,6 +119,8 @@ public class ControlAviones {
                 double costoUnoMejor = calcularCosto(unoMejor);
                 System.out.println("Costo Uno Mejor: " + costoUnoMejor);
             }
+
+            
 
 
 
@@ -176,12 +176,23 @@ public class ControlAviones {
         return costoTotal;
     }
 
-    public static List<List<Avion>> buscarVecinos(List<Avion> aviones) {
-        List<List<Avion>> vecinos = new ArrayList<>();
-        for (int i = 0; i < aviones.size(); i++) {
-            for (int j = i + 1; j < aviones.size(); j++) {
-                List<Avion> vecino = new ArrayList<>(aviones);
-                Collections.swap(vecino, i, j);
+    public static List<List<Asignacion>> buscarVecinos(List<Asignacion> asignaciones) {
+        List<List<Asignacion>> vecinos = new ArrayList<>();
+        for (int i = 0; i < asignaciones.size(); i++) {
+            for (int j = i + 1; j < asignaciones.size(); j++) {
+                // Crear una nueva lista con el mismo orden de aviones
+                List<Avion> orden = new ArrayList<>();
+                for (Asignacion asignacion : asignaciones) {
+                    orden.add(asignacion.avion);
+                }
+    
+                // Hacer swap en el orden de los aviones
+                Collections.swap(orden, i, j);
+    
+                // Volver a calcular tiempos basados en el nuevo orden
+                List<Asignacion> vecino = asignarTiempos(orden);
+    
+                // Agregar el nuevo vecino
                 vecinos.add(vecino);
             }
         }
@@ -310,22 +321,24 @@ public class ControlAviones {
 
     
     
-    public static List<Asignacion> MejorVecino(List<Asignacion> asignaciones) {
-        // Obtener todos los vecinos y encontrar el mejor
-        List<List<Avion> vecinos = buscarVecinos(asignaciones);
-        List<Asignacion> mejorVecino = null;
-        double mejorCosto = Double.MAX_VALUE;
-
+    public static List<Asignacion> MejorVecino(List<Asignacion> asignacionesActuales) {
+        List<Asignacion> mejorAsignacion = asignacionesActuales;
+        double mejorCosto = calcularCosto(asignacionesActuales);
+    
+        // Generar todos los vecinos
+        List<List<Asignacion>> vecinos = buscarVecinos(asignacionesActuales);
+    
         for (List<Asignacion> vecino : vecinos) {
-            double costo = calcularCosto(vecino);
-            System.out.println("Vecino " + (vecinos.indexOf(vecino) + 1) + " costo: " + costo);
-            if (costo < mejorCosto) {
-                mejorCosto = costo;
-                mejorVecino = vecino;
+            double costoVecino = calcularCosto(vecino);
+            if (costoVecino < mejorCosto) {
+                mejorCosto = costoVecino;
+                mejorAsignacion = vecino;
             }
         }
-        return mejorVecino;
+    
+        return mejorAsignacion;
     }
+    
 
     public static List<Asignacion> UnoMejor(List<Asignacion> asignaciones) {
         // Buscar en el vecindario y quedarme con el primero que mejore
