@@ -1,5 +1,5 @@
 import random
-
+import math
 
 def leer_case(filepath):
     with open(filepath, 'r') as f:
@@ -211,6 +211,57 @@ def grasp_hillclimbing_2pistas(aviones, matriz, n_reinicios=10):
             mejor_costo = costo
     return mejor_sol, mejor_costo
 
+def simulated_annealing_1pista(sol_inicial, aviones, matriz, T_init=1000, alpha=0.95, T_min=1e-3, max_iter=100):
+    actual = sol_inicial.copy()
+    costo_act = costo_total(actual, aviones)
+    T = T_init
+
+    while T > T_min:
+        for _ in range(max_iter):
+            vecino = actual.copy()
+            avion = random.choice(aviones)
+            id = avion['id']
+            delta = random.choice([-1, 1])
+            t_nuevo = vecino[id] + delta
+            if avion['Ek'] <= t_nuevo <= avion['Lk'] and es_valido(vecino, avion, t_nuevo, matriz):
+                vecino[id] = t_nuevo
+                costo_vec = costo_total(vecino, aviones)
+                delta_costo = costo_vec - costo_act
+                if delta_costo < 0 or random.random() < math.exp(-delta_costo / T):
+                    actual = vecino
+                    costo_act = costo_vec
+        T *= alpha
+
+    return actual, costo_act
+
+def simulated_annealing_2pistas(sol_inicial, aviones, matriz, T_init=1000, alpha=0.95, T_min=1e-3, max_iter=100):
+    actual = sol_inicial.copy()
+    costo_act = costo_total(actual, aviones)
+    T = T_init
+
+    while T > T_min:
+        for _ in range(max_iter):
+            vecino = actual.copy()
+            avion = random.choice(aviones)
+            id = avion['id']
+            for pista in [0, 1]:
+                key = (id, pista)
+                if key in vecino:
+                    delta = random.choice([-1, 1])
+                    t_nuevo = vecino[key] + delta
+                    if avion['Ek'] <= t_nuevo <= avion['Lk'] and es_valido_2pistas(vecino, avion, t_nuevo, pista, matriz):
+                        vecino[key] = t_nuevo
+                        costo_vec = costo_total(vecino, aviones)
+                        delta_costo = costo_vec - costo_act
+                        if delta_costo < 0 or random.random() < math.exp(-delta_costo / T):
+                            actual = vecino
+                            costo_act = costo_vec
+                        break
+        T *= alpha
+
+    return actual, costo_act
+
+
 if __name__ == '__main__':
     case = "case1.txt"
     print(f"\n=== Procesando {case} ===")
@@ -222,10 +273,21 @@ if __name__ == '__main__':
     print(f"Costo total: {costo_total(sol_det_1, aviones):.2f}")
 
     print("\n--- Greedy Estocástico (1 pista) ---")
-    for seed in range(3):
+    for seed in range(10):
         sol_est_1 = greedy_estocastico_1pista(aviones, matriz, seed)
         print(f"Seed {seed}: {sol_est_1}")
         print(f"Costo total: {costo_total(sol_est_1, aviones):.2f}")
+
+    print("\n--- Greedy Determinista (2 pistas) ---")
+    sol_det_2 = greedy_determinista_2pistas(aviones, matriz)
+    print(sol_det_2)
+    print(f"Costo total: {costo_total(sol_det_2, aviones):.2f}")
+
+    print("\n--- Greedy Estocástico (2 pistas) ---")
+    for seed in range(10):
+        sol_est_2 = greedy_estocastico_2pistas(aviones, matriz, seed)
+        print(f"Seed {seed}: {sol_est_2}")
+        print(f"Costo total: {costo_total(sol_est_2, aviones):.2f}")
 
     print("\n--- GRASP + Hill Climbing (1 pista) ---")
     grasp_sol, grasp_costo = grasp_hillclimbing(aviones, matriz, n_reinicios=10)
@@ -236,3 +298,15 @@ if __name__ == '__main__':
     grasp_sol_2, grasp_costo_2 = grasp_hillclimbing_2pistas(aviones, matriz, n_reinicios=10)
     print(f"Mejor solución GRASP 2 pistas: {grasp_sol_2}")
     print(f"Costo total GRASP 2 pistas: {grasp_costo_2:.2f}")
+    
+    print("\n--- Simulated Annealing (1 pista) ---")
+    sol_inicial_sa1 = greedy_estocastico_1pista(aviones, matriz, seed=0)
+    sa_sol_1, sa_cost_1 = simulated_annealing_1pista(sol_inicial_sa1, aviones, matriz)
+    print(f"Solución final SA 1 pista: {sa_sol_1}")
+    print(f"Costo total SA 1 pista: {sa_cost_1:.2f}")
+
+    print("\n--- Simulated Annealing (2 pistas) ---")
+    sol_inicial_sa2 = greedy_estocastico_2pistas(aviones, matriz, seed=0)
+    sa_sol_2, sa_cost_2 = simulated_annealing_2pistas(sol_inicial_sa2, aviones, matriz)
+    print(f"Solución final SA 2 pistas: {sa_sol_2}")
+    print(f"Costo total SA 2 pistas: {sa_cost_2:.2f}")
