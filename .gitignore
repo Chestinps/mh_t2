@@ -6,3 +6,6 @@ determinista.java
 estocastico.java
 TS.java
 SA.java
+
+# pycache
+__pycache__/

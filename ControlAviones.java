@@ -141,9 +141,9 @@ public class ControlAviones {
     }
     
 
-    //+---------------------+
-    //+-------Greedy--------+
-    //+---------------------+
+    //+----------------------------------------------------------------------+
+    //+------------------------------Greedy----------------------------------+
+    //+----------------------------------------------------------------------+
 
     public static List<Avion> ordenDeterminista(List<Avion> aviones) {
         aviones.sort((a1, a2) -> {
@@ -203,9 +203,9 @@ public class ControlAviones {
         return asignaciones;
     }
 
-    //+---------------------+
-    //+--------GRASP--------+
-    //+---------------------+
+    //+----------------------------------------------------------------------+
+    //+-------------------------------GRASP----------------------------------+
+    //+----------------------------------------------------------------------+
 
 
     public static List<Asignacion> buscarMejorSolucion(List<Asignacion> asignacionesIniciales, boolean usarBestImprovement) {
@@ -304,9 +304,9 @@ public class ControlAviones {
         return vecinos;
     }
 
-    //+---------------------+
-    //+-----Tabu Search-----+
-    //+---------------------+
+    //+----------------------------------------------------------------------+
+    //+----------------------------TABU SEARCH-------------------------------+
+    //+----------------------------------------------------------------------+
 
 
     public static List<Asignacion> tabuSearch(List<Asignacion> asignacionesIniciales, int tabuSize, int maxIteraciones) {
