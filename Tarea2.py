@@ -1,6 +1,7 @@
 import random
 import math
 
+
 def leer_case(filepath):
     with open(filepath, 'r') as f:
         lines = [line.strip() for line in f if line.strip() != '']
@@ -182,6 +183,55 @@ def generar_vecinos_2pistas(solucion, aviones, matriz):
                     if es_valido_2pistas(nueva_sol, avion, t_nuevo, pista, matriz):
                         vecinos.append(nueva_sol)
     return vecinos
+# ------------------------
+# GRASP determinista (AM)
+# ------------------------
+def grasp_determinista_am(aviones, matriz, n_reinicios=1):
+    mejor_sol = None
+    mejor_costo = float('inf')
+    for _ in range(n_reinicios):
+        sol_inicial = greedy_determinista_1pista(aviones, matriz)
+        refinada, costo = hill_climbing(sol_inicial, aviones, matriz)
+        if costo < mejor_costo:
+            mejor_sol = refinada
+            mejor_costo = costo
+    return mejor_sol, mejor_costo
+
+def grasp_determinista_2pistas_am(aviones, matriz, n_reinicios=1):
+    mejor_sol = None
+    mejor_costo = float('inf')
+    for _ in range(n_reinicios):
+        sol_inicial = greedy_determinista_2pistas(aviones, matriz)
+        refinada, costo = hill_climbing_2pistas(sol_inicial, aviones, matriz)
+        if costo < mejor_costo:
+            mejor_sol = refinada
+            mejor_costo = costo
+    return mejor_sol, mejor_costo
+
+# ------------------------
+# GRASP determinista (MM)
+# ------------------------
+def grasp_determinista_mm(aviones, matriz, n_reinicios=1):
+    mejor_sol = None
+    mejor_costo = float('inf')
+    for _ in range(n_reinicios):
+        sol_inicial = greedy_determinista_1pista(aviones, matriz)
+        refinada, costo = hill_climbing_mejor_mejora(sol_inicial, aviones, matriz)
+        if costo < mejor_costo:
+            mejor_sol = refinada
+            mejor_costo = costo
+    return mejor_sol, mejor_costo
+
+def grasp_determinista_2pistas_mm(aviones, matriz, n_reinicios=1):
+    mejor_sol = None
+    mejor_costo = float('inf')
+    for _ in range(n_reinicios):
+        sol_inicial = greedy_determinista_2pistas(aviones, matriz)
+        refinada, costo = hill_climbing_2pistas_mejor_mejora(sol_inicial, aviones, matriz)
+        if costo < mejor_costo:
+            mejor_sol = refinada
+            mejor_costo = costo
+    return mejor_sol, mejor_costo
 
 def hill_climbing_2pistas(sol_inicial, aviones, matriz, max_iter=100):
     actual = sol_inicial.copy()
@@ -211,17 +261,78 @@ def grasp_hillclimbing_2pistas(aviones, matriz, n_reinicios=10):
             mejor_costo = costo
     return mejor_sol, mejor_costo
 
+def hill_climbing_mejor_mejora(solucion_inicial, aviones, matriz, max_iter=100):
+    actual = solucion_inicial.copy()
+    mejor_costo = costo_total(actual, aviones)
+    for _ in range(max_iter):
+        vecinos = generar_vecinos(actual, aviones, matriz)
+        mejor_vecino = None
+        mejor_costo_vecino = mejor_costo
+        for vecino in vecinos:
+            costo = costo_total(vecino, aviones)
+            if costo < mejor_costo_vecino:
+                mejor_vecino = vecino
+                mejor_costo_vecino = costo
+        if mejor_vecino:
+            actual = mejor_vecino
+            mejor_costo = mejor_costo_vecino
+        else:
+            break
+    return actual, mejor_costo
+
+def hill_climbing_2pistas_mejor_mejora(sol_inicial, aviones, matriz, max_iter=100):
+    actual = sol_inicial.copy()
+    mejor_costo = costo_total(actual, aviones)
+    for _ in range(max_iter):
+        vecinos = generar_vecinos_2pistas(actual, aviones, matriz)
+        mejor_vecino = None
+        mejor_costo_vecino = mejor_costo
+        for vecino in vecinos:
+            costo = costo_total(vecino, aviones)
+            if costo < mejor_costo_vecino:
+                mejor_vecino = vecino
+                mejor_costo_vecino = costo
+        if mejor_vecino:
+            actual = mejor_vecino
+            mejor_costo = mejor_costo_vecino
+        else:
+            break
+    return actual, mejor_costo
+
+def grasp_hillclimbing_mejor_mejora(aviones, matriz, n_reinicios=10):
+    mejor_sol = None
+    mejor_costo = float('inf')
+    for seed in range(n_reinicios):
+        sol_inicial = greedy_estocastico_1pista(aviones, matriz, seed)
+        refinada, costo = hill_climbing_mejor_mejora(sol_inicial, aviones, matriz)
+        if costo < mejor_costo:
+            mejor_sol = refinada
+            mejor_costo = costo
+    return mejor_sol, mejor_costo
+
+def grasp_hillclimbing_2pistas_mejor_mejora(aviones, matriz, n_reinicios=10):
+    mejor_sol = None
+    mejor_costo = float('inf')
+    for seed in range(n_reinicios):
+        sol_inicial = greedy_estocastico_2pistas(aviones, matriz, seed)
+        refinada, costo = hill_climbing_2pistas_mejor_mejora(sol_inicial, aviones, matriz)
+        if costo < mejor_costo:
+            mejor_sol = refinada
+            mejor_costo = costo
+    return mejor_sol, mejor_costo
+
 def simulated_annealing_1pista(sol_inicial, aviones, matriz, T_init=1000, alpha=0.95, T_min=1e-3, max_iter=100):
     actual = sol_inicial.copy()
     costo_act = costo_total(actual, aviones)
     T = T_init
+    deltas = [-3, -2, -1, 1, 2, 3]  # mayor diversidad
 
     while T > T_min:
         for _ in range(max_iter):
             vecino = actual.copy()
             avion = random.choice(aviones)
             id = avion['id']
-            delta = random.choice([-1, 1])
+            delta = random.choice(deltas)
             t_nuevo = vecino[id] + delta
             if avion['Ek'] <= t_nuevo <= avion['Lk'] and es_valido(vecino, avion, t_nuevo, matriz):
                 vecino[id] = t_nuevo
@@ -232,12 +343,14 @@ def simulated_annealing_1pista(sol_inicial, aviones, matriz, T_init=1000, alpha=
                     costo_act = costo_vec
         T *= alpha
 
+    print(f"SA terminó con costo: {costo_act:.2f} y temperatura final: {T:.4f}")
     return actual, costo_act
 
 def simulated_annealing_2pistas(sol_inicial, aviones, matriz, T_init=1000, alpha=0.95, T_min=1e-3, max_iter=100):
     actual = sol_inicial.copy()
     costo_act = costo_total(actual, aviones)
     T = T_init
+    deltas = [-3, -2, -1, 1, 2, 3]
 
     while T > T_min:
         for _ in range(max_iter):
@@ -247,7 +360,7 @@ def simulated_annealing_2pistas(sol_inicial, aviones, matriz, T_init=1000, alpha
             for pista in [0, 1]:
                 key = (id, pista)
                 if key in vecino:
-                    delta = random.choice([-1, 1])
+                    delta = random.choice(deltas)
                     t_nuevo = vecino[key] + delta
                     if avion['Ek'] <= t_nuevo <= avion['Lk'] and es_valido_2pistas(vecino, avion, t_nuevo, pista, matriz):
                         vecino[key] = t_nuevo
@@ -259,7 +372,9 @@ def simulated_annealing_2pistas(sol_inicial, aviones, matriz, T_init=1000, alpha
                         break
         T *= alpha
 
+    print(f"SA terminó con costo: {costo_act:.2f} y temperatura final: {T:.4f}")
     return actual, costo_act
+
 
 
 if __name__ == '__main__':
@@ -289,24 +404,64 @@ if __name__ == '__main__':
         print(f"Seed {seed}: {sol_est_2}")
         print(f"Costo total: {costo_total(sol_est_2, aviones):.2f}")
 
-    print("\n--- GRASP + Hill Climbing (1 pista) ---")
+    print("\n--- GRASP Determinista + Hill Climbing (1 pista) - Alguna mejora ---")
+    grasp_det_am_sol, grasp_det_am_costo = grasp_determinista_am(aviones, matriz)
+    print(f"Solución GRASP Alguna mejora: {grasp_det_am_sol}")
+    print(f"Costo total GRASP Alguna mejora: {grasp_det_am_costo:.2f}")
+
+    print("\n--- GRASP Determinista + Hill Climbing (2 pistas) - Alguna mejora ---")
+    grasp_det_2_am_sol, grasp_det_2_am_costo = grasp_determinista_2pistas_am(aviones, matriz)
+    print(f"Solución GRASP 2 pistas determinista AM: {grasp_det_2_am_sol}")
+    print(f"Costo total GRASP 2 pistas determinista AM: {grasp_det_2_am_costo:.2f}")
+
+    print("\n--- GRASP Determinista + Hill Climbing (1 pista) - Mejora mejora ---")
+    grasp_det_mm_sol, grasp_det_mm_costo = grasp_determinista_mm(aviones, matriz)
+    print(f"Solución GRASP Mejora mejora: {grasp_det_mm_sol}")
+    print(f"Costo total GRASP Mejora mejora: {grasp_det_mm_costo:.2f}")
+
+    print("\n--- GRASP Determinista + Hill Climbing (2 pistas) - Mejora mejora ---")
+    grasp_det_2_mm_sol, grasp_det_2_mm_costo = grasp_determinista_2pistas_mm(aviones, matriz)
+    print(f"Solución GRASP Mejora mejora: {grasp_det_2_mm_sol}")
+    print(f"Costo total GRASP Mejora mejora: {grasp_det_2_mm_costo:.2f}")
+    
+    
+    print("\n--- GRASP Estocastico + Hill Climbing (1 pista) - Alguna Mejora ---")
     grasp_sol, grasp_costo = grasp_hillclimbing(aviones, matriz, n_reinicios=10)
     print(f"Mejor solución GRASP: {grasp_sol}")
     print(f"Costo total GRASP: {grasp_costo:.2f}")
 
-    print("\n--- GRASP + Hill Climbing (2 pistas) ---")
+    print("\n--- GRASP Estocastico + Hill Climbing (2 pistas) - Alguna Mejora ---")
     grasp_sol_2, grasp_costo_2 = grasp_hillclimbing_2pistas(aviones, matriz, n_reinicios=10)
     print(f"Mejor solución GRASP 2 pistas: {grasp_sol_2}")
     print(f"Costo total GRASP 2 pistas: {grasp_costo_2:.2f}")
     
-    print("\n--- Simulated Annealing (1 pista) ---")
-    sol_inicial_sa1 = greedy_estocastico_1pista(aviones, matriz, seed=0)
-    sa_sol_1, sa_cost_1 = simulated_annealing_1pista(sol_inicial_sa1, aviones, matriz)
-    print(f"Solución final SA 1 pista: {sa_sol_1}")
-    print(f"Costo total SA 1 pista: {sa_cost_1:.2f}")
+    print("\n--- GRASP Estocastico + Hill Climbing (1 pista, mejor mejora) ---")
+    grasp_sol_mejor, grasp_costo_mejor = grasp_hillclimbing_mejor_mejora(aviones, matriz, n_reinicios=10)
+    print(f"Mejor solución GRASP mejor mejora: {grasp_sol_mejor}")
+    print(f"Costo total GRASP mejor mejora: {grasp_costo_mejor:.2f}")
+    
+    print("\n--- GRASP Estocastico + Hill Climbing (2 pistas, mejor mejora) ---")
+    grasp_sol_2_mejor, grasp_costo_2_mejor = grasp_hillclimbing_2pistas_mejor_mejora(aviones, matriz, n_reinicios=10)
+    print(f"Mejor solución GRASP 2 pistas mejor mejora: {grasp_sol_2_mejor}")
+    print(f"Costo total GRASP 2 pistas mejor mejora: {grasp_costo_2_mejor:.2f}")
+    
+    print("\n--- Simulated Annealing - Comparación de 5 configuraciones (1 pista) ---")
+    configuraciones_sa = [
+        (500, 0.90),
+        (1000, 0.95),
+        (1500, 0.92),
+        (2000, 0.85),
+        (800, 0.98)
+    ]
+    for i, (T_init, alpha) in enumerate(configuraciones_sa):
+        for seed in range(3):  # ejecutar con diferentes seeds
+            sol_ini = greedy_estocastico_1pista(aviones, matriz, seed=seed)
+            sa_sol, sa_cost = simulated_annealing_1pista(sol_ini, aviones, matriz, T_init=T_init, alpha=alpha)
+            print(f"Config {i+1}, Seed {seed}: T_init={T_init}, alpha={alpha} -> Costo total: {sa_cost:.2f}")
 
-    print("\n--- Simulated Annealing (2 pistas) ---")
-    sol_inicial_sa2 = greedy_estocastico_2pistas(aviones, matriz, seed=0)
-    sa_sol_2, sa_cost_2 = simulated_annealing_2pistas(sol_inicial_sa2, aviones, matriz)
-    print(f"Solución final SA 2 pistas: {sa_sol_2}")
-    print(f"Costo total SA 2 pistas: {sa_cost_2:.2f}")
+    print("\n--- Simulated Annealing - Comparación de 5 configuraciones (2 pistas) ---")
+    for i, (T_init, alpha) in enumerate(configuraciones_sa):
+        for seed in range(3):
+            sol_ini = greedy_estocastico_2pistas(aviones, matriz, seed=seed)
+            sa_sol, sa_cost = simulated_annealing_2pistas(sol_ini, aviones, matriz, T_init=T_init, alpha=alpha)
+            print(f"Config {i+1}, Seed {seed}: T_init={T_init}, alpha={alpha} -> Costo total: {sa_cost:.2f}")
