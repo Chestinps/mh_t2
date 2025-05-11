@@ -11,7 +11,6 @@ def read_planes_data(file_path):
         if len(planes) >= num_planes:
             break
 
-        # Leer early, ideal, late, earlyPenalty, latePenalty
         early, ideal, late, earlyPenalty, latePenalty = map(float, lines[i].strip().split())
         i += 1
 
@@ -22,14 +21,14 @@ def read_planes_data(file_path):
             i += 1
 
         plane = {
-            'id': plane_id,  # ID del avión
+            'id': plane_id, 
             'early': int(early),
             'ideal': int(ideal),
             'late': int(late),
             'earlyPenalty': earlyPenalty,
             'latePenalty': latePenalty,
             'timeDiffs': timeDiffs,
-            'real': None     # Tiempo real de aterrizaje
+            'real': None 
         }
         planes.append(plane)
         plane_id += 1

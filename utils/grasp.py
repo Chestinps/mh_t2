@@ -1,4 +1,4 @@
-from utils.asignador import assign_real_times
+from utils.asignar_tiempos import assign_real_times
 from utils.greedy import calculate_total_cost
 
 def swap_planes(planes, i, j):
@@ -6,11 +6,11 @@ def swap_planes(planes, i, j):
     new_order[i], new_order[j] = new_order[j], new_order[i]
     return new_order
 
-
 def local_search_best_order(planes):
     current_order = planes.copy()
     assign_real_times(current_order)
     current_cost = calculate_total_cost(current_order)
+    history = [current_cost]
 
     improved = True
     while improved:
@@ -29,7 +29,9 @@ def local_search_best_order(planes):
                     best_order = swapped
                     improved = True
 
-        current_order = best_order
-        current_cost = best_cost
+        if improved:
+            current_order = best_order
+            current_cost = best_cost
+            history.append(current_cost)
 
-    return current_order, current_cost
+    return current_order, current_cost, history

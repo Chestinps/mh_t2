@@ -1,19 +1,27 @@
 from collections import deque
-from utils.asignador import assign_real_times
+from utils.asignar_tiempos import assign_real_times
 from utils.greedy import calculate_total_cost
-from utils.optimizer import swap_planes
+from utils.grasp import swap_planes
 import copy
 
+def split_planes_two_runways(order):
+    """
+    Divide los aviones entre dos pistas alternando por índice (pares e impares).
+    """
+    pista1 = [plane for idx, plane in enumerate(order) if idx % 2 == 0]
+    pista2 = [plane for idx, plane in enumerate(order) if idx % 2 != 0]
+    return pista1, pista2
+
 def tabu_search(initial_order, tabu_size, iterations):
-    current_order = copy.deepcopy(initial_order)
+    current_order = initial_order.copy()
     assign_real_times(current_order)
     current_cost = calculate_total_cost(current_order)
 
-    best_order = copy.deepcopy(current_order)
+    best_order = current_order
     best_cost = current_cost
 
+    cost_history = [best_cost]
     tabu_list = deque(maxlen=tabu_size)
-    cost_history = [current_cost]  # ← Aquí se almacena el costo en cada iteración
 
     for _ in range(iterations):
         best_neighbor = None
@@ -29,7 +37,7 @@ def tabu_search(initial_order, tabu_size, iterations):
                 assign_real_times(neighbor)
                 neighbor_cost = calculate_total_cost(neighbor)
 
-                # Criterio de aspiración: aceptar swap tabú si mejora el global
+                # Criterio de aspiración
                 if swap_move in tabu_list and neighbor_cost >= best_cost:
                     continue
 
@@ -42,13 +50,25 @@ def tabu_search(initial_order, tabu_size, iterations):
             current_order = best_neighbor
             current_cost = best_neighbor_cost
             tabu_list.append(best_swap)
-            cost_history.append(current_cost)  # ← Guardamos el costo en cada iteración
 
             if current_cost < best_cost:
-                best_order = copy.deepcopy(current_order)
+                best_order = current_order
                 best_cost = current_cost
-        else:
-            # Si no hay mejor vecino (muy raro), se repite el costo actual
-            cost_history.append(current_cost)
+
+        cost_history.append(best_cost)
 
     return best_order, best_cost, cost_history
+
+def tabu_search_two_runways(order, tabu_size, iterations):
+    """
+    Aplica Tabu Search sobre dos pistas de forma independiente y retorna el costo total combinado.
+    """
+    pista1, pista2 = split_planes_two_runways(order)
+
+    best_pista1, cost1, history1 = tabu_search(pista1, tabu_size, iterations)
+    best_pista2, cost2, history2 = tabu_search(pista2, tabu_size, iterations)
+
+    total_cost = cost1 + cost2
+    combined_order = best_pista1 + best_pista2
+
+    return combined_order, total_cost, (history1, history2)

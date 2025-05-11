@@ -1,12 +1,11 @@
-# main.py
-
 import os
 from utils.reader import read_planes_data
 from utils.greedy import get_time_difference, is_valid_landing_time, sort_planes_by_priority, generate_stochastic_orders, calculate_total_cost
-from utils.asignador import assign_real_times
-from utils.optimizer import local_search_best_order
+from utils.asignar_tiempos import assign_real_times
+from utils.grasp import local_search_best_order
 from utils.tabu import tabu_search
 import matplotlib.pyplot as plt
+
 
 def main():
     base_path = 'cases'
@@ -41,8 +40,8 @@ def main():
 
     print("\nAplicando Tabu Search sobre las soluciones estocásticas:")
 
-    tabu_size = 10
-    iterations = 100
+    tabu_size = 15
+    iterations = 20
 
     best_global_cost = float('inf')
     best_global_order = None
@@ -54,14 +53,6 @@ def main():
 
     print(f"\nCosto total del orden determinista: {total_cost:.2f}")
 
-    print("\nIniciando búsqueda local basada en swaps...")
-    best_order, best_cost = local_search_best_order(sorted_planes)
-
-    print("\nMejor orden encontrado tras búsqueda local:")
-    for plane in best_order:
-        print(f"Avión {plane['id']}: Ideal={plane['ideal']} → Real={plane['real']}")
-
-    print(f"\nCosto total optimizado por búsqueda local: {best_cost:.2f}")
 
 
     print("\nAplicando Tabu Search sobre las soluciones estocásticas:")
@@ -114,6 +105,37 @@ def main():
     plt.ylabel("Costo Total")
     plt.grid(True)
     plt.show()
+
+
+    print("\nAplicando Búsqueda Local sobre órdenes estocásticos...")
+
+    stochastic_histories = []
+
+    for idx, order in enumerate(stochastic_orders):
+        print(f"\n--- Orden Estocástico {idx + 1} ---")
+        assign_real_times(order)
+        initial_cost = calculate_total_cost(order)
+        print(f"Costo inicial: {initial_cost:.2f}")
+
+        best_order, best_cost, cost_history = local_search_best_order(order)
+        stochastic_histories.append(cost_history)
+
+        print(f"Costo tras búsqueda local: {best_cost:.2f}")
+
+
+    plt.figure(figsize=(10, 5))
+    for idx, history in enumerate(stochastic_histories):
+        plt.plot(history, label=f'Estocástico {idx + 1}', alpha=0.7)
+
+    plt.title("Evolución del costo - Búsqueda Local en órdenes estocásticos")
+    plt.xlabel("Iteración (mejoras)")
+    plt.ylabel("Costo total")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
 
     
 
