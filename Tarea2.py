@@ -4,7 +4,7 @@ import math
 
 def leer_case(filepath):
     with open(filepath, 'r') as f:
-        lines = [line.strip() for line in f if line.strip() != '']
+        lines = [line.strip() for line in f if line.strip()]
 
     D = int(lines[0])
     aviones = []
@@ -12,7 +12,12 @@ def leer_case(filepath):
 
     idx = 1
     for i in range(D):
-        Ek, Pk, Lk, Ci, Ck = map(float, lines[idx].split())
+        # Validación de línea de datos del avión
+        partes = lines[idx].split()
+        if len(partes) != 5:
+            raise ValueError(f"Línea {idx + 1} del archivo debe tener 5 elementos (Ek, Pk, Lk, Ci, Ck), pero tiene {len(partes)}: {partes}")
+
+        Ek, Pk, Lk, Ci, Ck = map(float, partes)
         avion = {
             'id': i,
             'Ek': int(Ek),
@@ -24,11 +29,19 @@ def leer_case(filepath):
         aviones.append(avion)
         idx += 1
 
-        separacion = list(map(int, lines[idx].split() + lines[idx + 1].split()))
+        # Leer líneas hasta acumular D elementos de separación
+        separacion = []
+        while len(separacion) < D and idx < len(lines):
+            separacion += list(map(int, lines[idx].split()))
+            idx += 1
+
+        if len(separacion) != D:
+            raise ValueError(f"La matriz de separación del avión {i} no tiene {D} elementos (tiene {len(separacion)}): {separacion}")
+
         matriz_separacion[i] = separacion
-        idx += 2
 
     return aviones, matriz_separacion
+
 
 def es_valido(asignacion, avion, tiempo, matriz):
     for id_prev, t_prev in asignacion.items():
